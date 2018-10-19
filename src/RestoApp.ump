@@ -1,0 +1,153 @@
+namespace ca.mcgill.ecse223.resto.model;
+
+use RestoAppPersistence.ump;
+use RestoAppTableStateMachine.ump;
+
+class RestoApp {
+   1 <@>- * Reservation reservations; // sorted by date and time
+   1 <@>- * Table tables;
+   0..1 -> * Table currentTables; // subsets tables
+   1 <@>- * Order orders;
+   0..1 -> * Order currentOrders; // subsets orders
+   1 <@>- 1 Menu menu;   
+   1 <@>- * PricedMenuItem pricedMenuItems;
+   1 <@>- * Bill bills;
+   1 <@>- * LoyaltyCard loyaltyCards;
+}
+
+class LoyaltyCard {
+	autounique loyaltyCardNumber;
+	contactName;
+    contactEmailAddress;
+    contactPhoneNumber;
+    contactPostalCode;
+}
+
+class Reservation {
+   depend java.text.SimpleDateFormat;
+   depend java.text.ParseException;
+   Date date;
+   Time time;
+   Integer numberInParty;
+   contactName;
+   contactEmailAddress;
+   contactPhoneNumber;
+   autounique reservationNumber;
+   * reservations -- 1..* Table tables; // only from currentTables
+   
+     public Boolean doesOverlap (Date date, Time time) {
+	  
+	  Date oldDate = getDate();
+	  Time oldTime = getTime();
+	  SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	  
+	  String newReservationDateStr = date + " " + time;
+	  java.util.Date newReservationDate = new java.util.Date();
+	  try {
+		  newReservationDate = sdf.parse(newReservationDateStr);
+	  } catch (ParseException pe){
+		  pe.printStackTrace();
+	  }
+	  
+	  String oldReservationDateStr = oldDate + " " + oldTime;
+	  java.util.Date oldReservationDate = new java.util.Date();
+	  try {
+		  oldReservationDate = sdf.parse(oldReservationDateStr);
+	  } catch (ParseException pe){
+		  pe.printStackTrace();
+	  }
+	  
+	  java.util.Date newReservationDateEnd = new java.util.Date(newReservationDate.getTime() + 2*60*60*1000L);
+	  java.util.Date oldReservationDateEnd = new java.util.Date(oldReservationDate.getTime() + 2*60*60*1000L);  
+	  
+	  if (oldReservationDateEnd.before(newReservationDate)) 
+		  return false;
+	  
+	  if (newReservationDateEnd.before(oldReservationDate))
+		  return false;
+	  
+	  else 	  return true;
+  }
+}
+
+class Table {
+   unique Integer number;
+   Integer x;
+   Integer y;
+   Integer width;
+   Integer length;
+   1 <@>- 1..* Seat seats;
+   0..1 -> * Seat currentSeats; // subsets seats
+   
+      public Boolean doesOverlap (int x, int y, int width, int length) {
+	  
+	  int xToCompare = getX();
+	  int yToCompare = getY();
+	  int widthToCompare = getWidth();
+	  int lengthToCompare = getLength();
+	  Boolean xError = false, yError = false;
+	  
+	  if (x < xToCompare) {
+		  if ((x+width+50) <= xToCompare) 			xError = false;
+		  else	 									xError = true;
+	  }
+	  if (x == xToCompare) 							xError = true;
+	  if (x > xToCompare) {
+		  if (x >= (xToCompare+widthToCompare+50))	xError = false;
+		  else   									xError = true;
+	  }	  
+	  
+	  if (y < yToCompare) {
+		  if ((y+length+50) <= yToCompare)		 	yError = false;
+		  else 									  	yError = true;
+	  }
+	  if (y == yToCompare) 						 	yError = true;
+	  if (y > yToCompare) {
+		  if (y >= (yToCompare+lengthToCompare+50)) yError = false;
+		  else 										yError = true;
+	  }
+	  
+	  if (xError && yError) 	return true;
+	  else 						return false;
+	  
+  }
+}
+
+class Seat {
+}
+
+class Order {
+   Date date;
+   Time time;
+   autounique number;
+   * orders -- 1..* Table tables; // only from currentTables for currentOrders
+   1 <@>- * OrderItem orderItems;
+   * orders -- 0..1 LoyaltyCard loyaltyCard;
+}
+
+class OrderItem {
+   Integer quantity;
+   * orderItems -- 1 PricedMenuItem pricedMenuItem; // only from MenuItem.currentPricedMenuItem for currentOrders
+   * orderItems -- 1..* Seat seats; // only from order.tables.seats
+}
+
+class Menu {   
+   1 <@>- * MenuItem menuItems;
+}
+
+class MenuItem {
+   unique name;
+   enum ItemCategory { Appetizer, Main, Dessert, AlcoholicBeverage, NonAlcoholicBeverage }
+   lazy ItemCategory itemCategory;
+   1 -- 1..* PricedMenuItem pricedMenuItems;
+   0..1 -> 0..1 PricedMenuItem currentPricedMenuItem; // subsets priced menus items
+}
+
+class PricedMenuItem {
+   Double price;
+}
+
+class Bill {
+   * bills -- 1 Order order; // order.bills.issuedForSeats = order.orderItems.seats
+   * bills -- 1..* Seat issuedForSeats; // only from order.orderItems.seats;
+}
